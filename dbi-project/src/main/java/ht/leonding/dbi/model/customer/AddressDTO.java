@@ -1,4 +1,8 @@
 package ht.leonding.dbi.model.customer;
 
-public class AddressDTO {
+public record AddressDTO(
+        String street,
+        String city,
+        String zip
+) {
 }

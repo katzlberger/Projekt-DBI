@@ -1,4 +1,12 @@
 package ht.leonding.dbi.model.product;
 
-public class ProductDTO {
+import java.math.BigDecimal;
+
+public record ProductDTO(
+        Long id,
+        String name,
+        BigDecimal price,
+        boolean active,
+        String type
+) {
 }

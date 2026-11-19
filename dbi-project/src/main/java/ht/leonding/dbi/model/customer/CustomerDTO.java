@@ -1,4 +1,10 @@
 package ht.leonding.dbi.model.customer;
 
-public class CustomerDTO {
+public record CustomerDTO (
+        Long id,
+        String firstName,
+        String LastName,
+        String email,
+        AddressDTO address
+){
 }
