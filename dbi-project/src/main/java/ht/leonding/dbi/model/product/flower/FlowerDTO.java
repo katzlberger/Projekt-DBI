@@ -8,6 +8,7 @@ public record FlowerDTO(
         BigDecimal price,
         boolean active,
         String color,
-        int stock
+        int stock,
+        String type
 ) {
 }

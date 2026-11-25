@@ -1,4 +1,4 @@
 package ht.leonding.dbi.workload.product;
 
-public class ProductService {
+public interface ProductService {
 }
