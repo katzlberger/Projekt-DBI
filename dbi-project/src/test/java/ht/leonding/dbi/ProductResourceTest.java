@@ -1,4 +1,4 @@
-package ht.leonding.dbi.api;
+package ht.leonding.dbi;
 
 import ht.leonding.dbi.model.product.bouquet.BouquetItemRequest;
 import ht.leonding.dbi.model.product.bouquet.CreateBouquetRequest;
