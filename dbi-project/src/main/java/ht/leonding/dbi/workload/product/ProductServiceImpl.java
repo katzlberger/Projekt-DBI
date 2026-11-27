@@ -18,6 +18,7 @@ import jakarta.ws.rs.BadRequestException;
 import jakarta.ws.rs.NotFoundException;
 import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.Response;
+import org.hibernate.StaleObjectStateException;
 
 import java.time.LocalDate;
 import java.util.HashSet;
@@ -130,6 +131,11 @@ public class ProductServiceImpl implements ProductService {
         }
         p.setName(request.name());
         p.setPrice(request.price());
+        try {
+            productRepository.flush();
+        } catch (StaleObjectStateException e) {
+            throw new WebApplicationException("Produkt wurde zwischenzeitlich geändert", Response.Status.CONFLICT);
+        }
         return productMapper.toDTO(p);
     }
 

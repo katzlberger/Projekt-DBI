@@ -36,6 +36,11 @@ public class ProductRepositoryImpl implements ProductRepository {
     }
 
     @Override
+    public void flush() {
+        em.flush();
+    }
+
+    @Override
     public List<Product> findAll(Class<? extends Product> type, Boolean active) {
         StringBuilder jpql = new StringBuilder("select p from Product p where 1 = 1");
         if (type != null) jpql.append(" and type(p) = :type");

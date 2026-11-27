@@ -15,6 +15,8 @@ public interface ProductRepository {
 
     void remove(Product product);
 
+    void flush();
+
     List<Product> findAll(Class<? extends Product> type, Boolean active);
 
     List<Flower> findFlowers(String color, boolean availableOnly);
