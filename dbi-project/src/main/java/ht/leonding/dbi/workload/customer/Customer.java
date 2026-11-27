@@ -5,6 +5,7 @@ import jakarta.persistence.*;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 @Entity
 public class Customer {
@@ -28,7 +29,7 @@ public class Customer {
     public Customer(String firstName, String lastName, String email) {
         this.firstName = firstName;
         this.lastName = lastName;
-        this.email = email;
+        this.email = normalize(email);
     }
 
     public Customer() {
@@ -59,11 +60,11 @@ public class Customer {
     }
 
     public void setLastName(String lastName) {
-        lastName = lastName;
+        this.lastName = lastName;
     }
 
     public void setEmail(String email) {
-        this.email = email;
+        this.email = normalize(email);
     }
 
     public void addAddress(Address address) {
@@ -74,5 +75,9 @@ public class Customer {
     public void removeAddress(Address address) {
         addresses.remove(address);
         address.setCustomer(null);
+    }
+
+    private static String normalize(String email) {
+        return email == null ? null : email.trim().toLowerCase(Locale.ROOT);
     }
 }

@@ -9,6 +9,7 @@ public record PaymentDTO(
         BigDecimal amount,
         String status,
         LocalDateTime paidAt,
-        String Last4Digits
+        String last4Digits,
+        BigDecimal changeReturned
 ) {
 }

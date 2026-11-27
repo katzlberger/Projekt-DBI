@@ -16,12 +16,6 @@ public class CustomerRepositoryImpl implements CustomerRepository{
 
 
     @Override
-    public List<Customer> findAll() {
-        return em.createQuery("select c from Customer c", Customer.class)
-                .getResultList();
-    }
-
-    @Override
     public Customer findById(Long id) {
         return em.find(Customer.class, id);
     }
@@ -35,21 +29,10 @@ public class CustomerRepositoryImpl implements CustomerRepository{
                 .orElse(null);
     }
 
-    @Override
-    public boolean existsByEmail(String email) {
-        return em.createQuery(
-                        "select count(c) from Customer c where c.email = :email", Long.class)
-                .setParameter("email", email)
-                .getSingleResult() > 0;
-    }
 
     @Override
     public void add(Customer customer) {
         em.persist(customer);
     }
 
-    @Override
-    public void delete(Customer customer) {
-        em.remove(customer);
-    }
 }

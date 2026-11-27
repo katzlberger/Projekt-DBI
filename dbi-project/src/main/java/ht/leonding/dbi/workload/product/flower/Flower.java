@@ -25,4 +25,27 @@ public class Flower extends Product {
     public void setStock(Integer stock) {
         this.stock = stock;
     }
+
+    @Override
+    public String getProductType() {
+        return "FLOWER";
+    }
+
+    @Override
+    public void reserveStock(int quantity) {
+        decreaseStock(quantity);
+    }
+
+    @Override
+    public void releaseStock(int quantity) {
+        increaseStock(quantity);
+    }
+
+    public void decreaseStock(int quantity) {
+        this.stock -= quantity;
+    }
+
+    public void increaseStock(int quantity) {
+        this.stock += quantity;
+    }
 }

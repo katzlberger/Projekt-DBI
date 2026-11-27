@@ -50,7 +50,7 @@ public abstract class Payment {
 
     public abstract PaymentMethod getMethod();
 
-    public void markPaid() {
+    protected void markPaid() {
         this.status = PaymentStatus.PAID;
         this.paidAt = LocalDateTime.now();
     }

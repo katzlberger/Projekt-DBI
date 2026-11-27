@@ -3,8 +3,6 @@ package ht.leonding.dbi.workload.payment;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.persistence.EntityManager;
 
-import java.util.List;
-
 @ApplicationScoped
 public class PaymentRepositoryImpl implements PaymentRepository {
 
@@ -12,12 +10,6 @@ public class PaymentRepositoryImpl implements PaymentRepository {
 
     public PaymentRepositoryImpl(EntityManager em) {
         this.em = em;
-    }
-
-    @Override
-    public List<Payment> findAll() {
-        return em.createQuery("select p from Payment p", Payment.class)
-                .getResultList();
     }
 
     @Override
@@ -35,19 +27,7 @@ public class PaymentRepositoryImpl implements PaymentRepository {
     }
 
     @Override
-    public boolean existsByOrderId(Long orderId) {
-        return em.createQuery("select count(o) from Order o where o.id = :orderId and o.payment is not null", Long.class)
-                .setParameter("orderId", orderId)
-                .getSingleResult() > 0;
-    }
-
-    @Override
     public void add(Payment payment) {
         em.persist(payment);
-    }
-
-    @Override
-    public void delete(Payment payment) {
-        em.remove(payment);
     }
 }

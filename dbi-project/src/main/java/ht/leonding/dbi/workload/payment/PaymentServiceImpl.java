@@ -1,6 +1,7 @@
 package ht.leonding.dbi.workload.payment;
 
 import ht.leonding.dbi.error.DuplicateException;
+import ht.leonding.dbi.error.InvalidRequestException;
 import ht.leonding.dbi.error.NotFoundException;
 import ht.leonding.dbi.model.payment.PaymentDTO;
 import ht.leonding.dbi.workload.order.FulfillmentType;
@@ -9,7 +10,6 @@ import ht.leonding.dbi.workload.order.OrderRepository;
 import ht.leonding.dbi.workload.order.OrderStatus;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;
-import jakarta.ws.rs.BadRequestException;
 
 import java.math.BigDecimal;
 
@@ -51,15 +51,18 @@ public class PaymentServiceImpl implements PaymentService {
     @Transactional
     public PaymentDTO createPayment(Long orderId, PaymentMethod method, String cardHolder, String cardNumber) {
         if (orderId == null) {
-            throw new BadRequestException("Order id must not be null");
+            throw new InvalidRequestException("Order id must not be null");
         }
         if (method == null) {
-            throw new BadRequestException("Payment method must not be null");
+            throw new InvalidRequestException("Payment method must not be null");
         }
 
         Order order = orderRepository.findById(orderId);
         if (order == null) {
             throw new NotFoundException("Order " + orderId + " not found");
+        }
+        if (order.getStatus() != OrderStatus.NEW) {
+            throw new InvalidRequestException("Order " + orderId + " is not open for payment");
         }
         if (order.getPayment() != null) {
             throw new DuplicateException("Order " + orderId + " already has a payment");
@@ -69,19 +72,22 @@ public class PaymentServiceImpl implements PaymentService {
         Payment payment;
         switch (method) {
             case CARD -> {
+                if (cardHolder == null || cardHolder.isBlank()) {
+                    throw new InvalidRequestException("Card holder must not be blank");
+                }
                 if (cardNumber == null || !cardNumber.matches("\\d{16}")) {
-                    throw new BadRequestException("Card number must have exactly 16 digits");
+                    throw new InvalidRequestException("Card number must have exactly 16 digits");
                 }
                 payment = new CardPayment(amount, cardHolder, cardNumber.substring(12));
-                order.setStatus(OrderStatus.PAID);
+                order.markPaid();
             }
             case CASH -> {
                 if (order.getFulfillmentType() != FulfillmentType.PICKUP) {
-                    throw new BadRequestException("Cash payment is only allowed for pickup orders");
+                    throw new InvalidRequestException("Cash payment is only allowed for pickup orders");
                 }
                 payment = new CashPayment(amount);
             }
-            default -> throw new BadRequestException("Unsupported payment method " + method);
+            default -> throw new InvalidRequestException("Unsupported payment method " + method);
         }
 
         order.setPayment(payment);
@@ -96,17 +102,20 @@ public class PaymentServiceImpl implements PaymentService {
         if (order == null || order.getPayment() == null) {
             throw new NotFoundException("No payment for order " + orderId);
         }
+        if (order.getStatus() != OrderStatus.NEW) {
+            throw new InvalidRequestException("Order " + orderId + " is not open for payment");
+        }
 
         Payment payment = order.getPayment();
         if (payment.getStatus() == PaymentStatus.PAID) {
-            throw new BadRequestException("Payment for order " + orderId + " is already paid");
+            throw new InvalidRequestException("Payment for order " + orderId + " is already paid");
         }
         if (!(payment instanceof CashPayment cash)) {
-            throw new BadRequestException("Only cash payments can be booked here");
+            throw new InvalidRequestException("Only cash payments can be booked here");
         }
 
         cash.markPaid(amountGiven);
-        order.setStatus(OrderStatus.PAID);
+        order.markPaid();
         return paymentMapper.toDto(payment);
     }
 }

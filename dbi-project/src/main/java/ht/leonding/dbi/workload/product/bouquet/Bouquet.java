@@ -24,5 +24,23 @@ public class Bouquet extends Product {
     public void addItem(Flower flower, int quantity) {
         items.add(new BouquetItem(this, flower, quantity));
     }
-}
 
+    @Override
+    public String getProductType() {
+        return "BOUQUET";
+    }
+
+    @Override
+    public void reserveStock(int quantity) {
+        for (BouquetItem item : items) {
+            item.getFlower().reserveStock(item.getQuantity() * quantity);
+        }
+    }
+
+    @Override
+    public void releaseStock(int quantity) {
+        for (BouquetItem item : items) {
+            item.getFlower().releaseStock(item.getQuantity() * quantity);
+        }
+    }
+}

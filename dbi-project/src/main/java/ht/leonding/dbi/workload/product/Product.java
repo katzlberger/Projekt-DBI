@@ -21,9 +21,6 @@ public abstract class Product {
     @Column(nullable = false)
     private boolean active = true;
 
-    @Version
-    private Long version;
-
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     public String getName() { return name; }
@@ -32,6 +29,4 @@ public abstract class Product {
     public void setPrice(BigDecimal price) { this.price = price; }
     public boolean isActive() { return active; }
     public void setActive(boolean active) { this.active = active; }
-    public Long getVersion() { return version; }
-    public void setVersion(Long version) { this.version = version; }
 }
