@@ -4,7 +4,6 @@ import java.util.List;
 
 public record CreateBouquetRequest(
         String name,
-        List<BouquetItemDTO> items,
-
+        List<BouquetItemDTO> items
 ) {
 }
