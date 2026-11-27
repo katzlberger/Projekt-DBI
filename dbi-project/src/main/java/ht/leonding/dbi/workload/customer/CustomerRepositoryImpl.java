@@ -28,14 +28,17 @@ public class CustomerRepositoryImpl implements CustomerRepository{
 
     @Override
     public Customer findByEmail(String email) {
-        return em.createQuery("select c from Customer c where c.email == :email", Customer.class)
-                .setParameter(email, email)
-                .getSingleResult();
+        return em.createQuery("select c from Customer c where c.email = :email", Customer.class)
+                .setParameter("email", email)
+                .getResultStream()
+                .findFirst()
+                .orElse(null);
     }
 
     @Override
     public boolean existsByEmail(String email) {
-        return em.createQuery("select COUNT(c) from Customer where c.email == :email", Long.class)
+        return em.createQuery(
+                        "select count(c) from Customer c where c.email = :email", Long.class)
                 .setParameter("email", email)
                 .getSingleResult() > 0;
     }

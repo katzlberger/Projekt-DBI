@@ -27,7 +27,7 @@ public class Customer {
 
     public Customer(String firstName, String lastName, String email) {
         this.firstName = firstName;
-        lastName = lastName;
+        this.lastName = lastName;
         this.email = email;
     }
 
