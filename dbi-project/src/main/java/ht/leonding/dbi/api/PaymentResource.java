@@ -1,6 +1,5 @@
 package ht.leonding.dbi.api;
 
-import ht.leonding.dbi.model.order.MarkPaidRequest;
 import ht.leonding.dbi.model.payment.CreatePaymentRequest;
 import ht.leonding.dbi.model.payment.PaymentDTO;
 import ht.leonding.dbi.workload.payment.PaymentMethod;
@@ -11,7 +10,6 @@ import jakarta.ws.rs.BadRequestException;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
-import jakarta.ws.rs.PUT;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
@@ -51,19 +49,12 @@ public class PaymentResource {
         PaymentDTO dto = service.createPayment(
                 request.orderId(),
                 parseMethod(request.method()),
-                request.amount(),
                 request.cardHolder(),
-                request.last4Digits()
+                request.cardNumber()
         );
         return Response.created(uriInfo.getBaseUriBuilder().path("api/payments/{id}").build(dto.id()))
                 .entity(dto)
                 .build();
-    }
-
-    @PUT
-    @Path("/{id}/pay")
-    public Response markPaid(@PathParam("id") Long id, @Valid MarkPaidRequest request) {
-        return Response.ok(service.markPaid(id, request.amountGiven())).build();
     }
 
     private PaymentMethod parseMethod(String method) {

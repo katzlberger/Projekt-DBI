@@ -19,10 +19,11 @@ public class CardPayment extends Payment {
     public CardPayment() {
     }
 
-    public CardPayment(Long orderId, BigDecimal amount, String cardHolder, String last4Digits) {
-        super(orderId, amount);
+    public CardPayment(BigDecimal amount, String cardHolder, String last4Digits) {
+        super(amount);
         this.cardHolder = cardHolder;
         this.last4Digits = last4Digits;
+        markPaid();
     }
 
     @Override

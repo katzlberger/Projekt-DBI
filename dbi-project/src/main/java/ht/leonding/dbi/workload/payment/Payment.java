@@ -15,10 +15,6 @@ public abstract class Payment {
     @GeneratedValue
     private Long id;
 
-    // Until the Order entity exists this keeps the link to the order.
-    @Column(nullable=false, unique=true)
-    private Long orderId;
-
     @Column(nullable=false, precision=10, scale=2)
     private BigDecimal amount;
 
@@ -31,18 +27,13 @@ public abstract class Payment {
     protected Payment() {
     }
 
-    protected Payment(Long orderId, BigDecimal amount) {
-        this.orderId = orderId;
+    protected Payment(BigDecimal amount) {
         this.amount = amount;
         this.status = PaymentStatus.PENDING;
     }
 
     public Long getId() {
         return id;
-    }
-
-    public Long getOrderId() {
-        return orderId;
     }
 
     public BigDecimal getAmount() {
