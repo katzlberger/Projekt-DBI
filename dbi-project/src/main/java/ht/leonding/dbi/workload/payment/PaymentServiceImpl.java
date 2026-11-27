@@ -42,7 +42,7 @@ public class PaymentServiceImpl implements PaymentService {
 
     @Override
     @Transactional
-    public PaymentDTO createPayment(Long orderId, PaymentMethod method, BigDecimal amount, String last4Digits) {
+    public PaymentDTO createPayment(Long orderId, PaymentMethod method, BigDecimal amount, String cardHolder, String last4Digits) {
         if (orderId == null) {
             throw new InvalidRequestException("Order id must not be null");
         }
@@ -52,19 +52,24 @@ public class PaymentServiceImpl implements PaymentService {
         if (amount == null || amount.signum() <= 0) {
             throw new InvalidRequestException("Payment amount must be positive");
         }
-        if (method == PaymentMethod.CARD && (last4Digits == null || !last4Digits.matches("\\d{4}"))) {
-            throw new InvalidRequestException("Card payment requires exactly the last 4 digits");
-        }
         if (paymentRepository.existsByOrderId(orderId)) {
             throw new DuplicateException("Payment for order " + orderId + " already exists");
         }
 
-        Payment payment = paymentMapper.toEntity(
-                orderId,
-                method,
-                amount,
-                method == PaymentMethod.CARD ? last4Digits : null
-        );
+        Payment payment;
+        switch (method) {
+            case CARD -> {
+                if (last4Digits == null || !last4Digits.matches("\\d{4}")) {
+                    throw new InvalidRequestException("Card payment requires exactly the last 4 digits");
+                }
+                CardPayment cardPayment = new CardPayment(orderId, amount, cardHolder, last4Digits);
+                cardPayment.markPaid();
+                payment = cardPayment;
+            }
+            case CASH -> payment = new CashPayment(orderId, amount);
+            default -> throw new InvalidRequestException("Unsupported payment method " + method);
+        }
+
         paymentRepository.add(payment);
         return paymentMapper.toDto(payment);
     }
@@ -79,12 +84,11 @@ public class PaymentServiceImpl implements PaymentService {
         if (payment.getStatus() == PaymentStatus.PAID) {
             throw new InvalidRequestException("Payment " + id + " is already paid");
         }
-        if (payment.getMethod() == PaymentMethod.CASH
-                && (amountGiven == null || amountGiven.compareTo(payment.getAmount()) < 0)) {
-            throw new InvalidRequestException("Insufficient cash amount for payment " + id);
+        if (!(payment instanceof CashPayment cash)) {
+            throw new InvalidRequestException("Only cash payments can be booked here");
         }
 
-        payment.markPaid();
+        cash.markPaid(amountGiven);
         return paymentMapper.toDto(payment);
     }
 }
