@@ -27,7 +27,7 @@ public class OrderResource {
     @POST
     public Response createOrder(@Valid CreateOrderRequest request) {
         OrderDTO dto = service.createOrder(request);
-        return Response.created(uriInfo.getAbsolutePathBuilder().path("api/orders/{id}").build(dto.id()))
+        return Response.created(uriInfo.getBaseUriBuilder().path("api/orders/{id}").build(dto.id()))
                 .entity(dto).build();
     }
 
