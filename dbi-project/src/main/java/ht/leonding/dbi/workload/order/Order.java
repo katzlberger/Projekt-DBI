@@ -52,11 +52,24 @@ public class Order {
     public Order() {
     }
 
-    public Order(Customer customer, FulfillmentType fulfillmentType, LocalDate deliveryDate, Address deliveryAddress) {
+    public Order(Customer customer, FulfillmentType fulfillmentType,
+                 LocalDate deliveryDate, Address deliveryAddress) {
+        if (customer == null) {
+            throw new InvalidRequestException("Customer is required");
+        }
+        if (fulfillmentType == null) {
+            throw new InvalidRequestException("Fulfillment type is required");
+        }
+        if (deliveryDate == null) {
+            throw new InvalidRequestException("Date is required");
+        }
+        if (fulfillmentType == FulfillmentType.DELIVERY && deliveryAddress == null) {
+            throw new InvalidRequestException("Delivery needs an address");
+        }
         this.customer = customer;
         this.fulfillmentType = fulfillmentType;
         this.deliveryDate = deliveryDate;
-        this.deliveryAddress = deliveryAddress;
+        this.deliveryAddress = fulfillmentType == FulfillmentType.DELIVERY ? deliveryAddress : null;
     }
 
     public Long getId() {

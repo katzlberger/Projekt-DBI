@@ -5,6 +5,8 @@ import ht.leonding.dbi.model.customer.CustomerDTO;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;
 
+import java.util.Locale;
+
 @ApplicationScoped
 public class CustomerServiceImpl implements CustomerService {
 
@@ -29,9 +31,10 @@ public class CustomerServiceImpl implements CustomerService {
     @Override
     @Transactional
     public CustomerDTO findByEmail(String email) {
-        Customer customer = customerRepository.findByEmail(email);
+        String normalized = email.trim().toLowerCase(Locale.ROOT);
+        Customer customer = customerRepository.findByEmail(normalized);
         if (customer == null) {
-            throw new NotFoundException("No customer with email " + email);
+            throw new NotFoundException("No customer with email " + normalized);
         }
         return customerMapper.toDto(customer);
     }
