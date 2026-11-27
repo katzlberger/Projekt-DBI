@@ -1,8 +1,9 @@
-package ht.leonding.dbi.workload.payment;
+package ht.leonding.dbi;
 
 import ht.leonding.dbi.error.DuplicateException;
 import ht.leonding.dbi.error.InvalidRequestException;
 import ht.leonding.dbi.model.payment.PaymentDTO;
+import ht.leonding.dbi.workload.payment.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -12,7 +13,7 @@ import java.math.BigDecimal;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-class PaymentServiceTest {
+class  PaymentServiceTest {
 
     private static final BigDecimal AMOUNT = new BigDecimal("12.50");
 
