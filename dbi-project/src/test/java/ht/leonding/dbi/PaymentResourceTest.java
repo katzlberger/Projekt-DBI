@@ -159,7 +159,8 @@ class PaymentResourceTest {
                 .body(Map.of("amountGiven", new BigDecimal("10.00")))
                 .when().put("/api/orders/{orderId}/pay", cashOrderId)
                 .then()
-                .statusCode(500); // ohne DomainExceptionMapper (wie gewünscht)
+                .statusCode(400)
+                .body("message", containsString("Insufficient cash"));
     }
 
     @Test
@@ -170,5 +171,38 @@ class PaymentResourceTest {
                 .when().post("/api/payments")
                 .then()
                 .statusCode(405);
+    }
+    
+    @Test
+    void findById_unknown_returns404() {
+        given().when().get("/api/payments/{id}", 999_999)
+                .then().statusCode(404)
+                .body("message", containsString("999999"));
+    }
+
+    @Test
+    void findByOrderId_unknownOrder_returns404() {
+        given().queryParam("orderId", 999_999)
+                .when().get("/api/payments")
+                .then().statusCode(404);
+    }
+
+    @Test
+    void markPaid_cardPayment_isRejected() {
+        given().contentType("application/json")
+                .body(Map.of("amountGiven", new BigDecimal("20.00")))
+                .when().put("/api/orders/{orderId}/pay", cardOrderId)
+                .then().statusCode(400);
+    }
+
+    @Test
+    void markPaid_insufficientCash_keepsPaymentPending() {
+        given().contentType("application/json")
+                .body(Map.of("amountGiven", new BigDecimal("10.00")))
+                .when().put("/api/orders/{orderId}/pay", cashOrderId)
+                .then().statusCode(400);
+
+        given().when().get("/api/payments/{id}", cashPaymentId)
+                .then().body("status", is("PENDING"));   // nothing was changed
     }
 }
