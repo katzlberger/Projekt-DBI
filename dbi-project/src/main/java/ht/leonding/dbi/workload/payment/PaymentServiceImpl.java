@@ -1,11 +1,15 @@
 package ht.leonding.dbi.workload.payment;
 
 import ht.leonding.dbi.error.DuplicateException;
-import ht.leonding.dbi.error.InvalidRequestException;
 import ht.leonding.dbi.error.NotFoundException;
 import ht.leonding.dbi.model.payment.PaymentDTO;
+import ht.leonding.dbi.workload.order.FulfillmentType;
+import ht.leonding.dbi.workload.order.Order;
+import ht.leonding.dbi.workload.order.OrderRepository;
+import ht.leonding.dbi.workload.order.OrderStatus;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;
+import jakarta.ws.rs.BadRequestException;
 
 import java.math.BigDecimal;
 
@@ -14,10 +18,13 @@ public class PaymentServiceImpl implements PaymentService {
 
     private final PaymentRepository paymentRepository;
     private final PaymentMapper paymentMapper;
+    private final OrderRepository orderRepository;
 
-    public PaymentServiceImpl(PaymentRepository paymentRepository, PaymentMapper paymentMapper) {
+    public PaymentServiceImpl(PaymentRepository paymentRepository, PaymentMapper paymentMapper,
+                              OrderRepository orderRepository) {
         this.paymentRepository = paymentRepository;
         this.paymentMapper = paymentMapper;
+        this.orderRepository = orderRepository;
     }
 
     @Override
@@ -42,53 +49,64 @@ public class PaymentServiceImpl implements PaymentService {
 
     @Override
     @Transactional
-    public PaymentDTO createPayment(Long orderId, PaymentMethod method, BigDecimal amount, String cardHolder, String last4Digits) {
+    public PaymentDTO createPayment(Long orderId, PaymentMethod method, String cardHolder, String cardNumber) {
         if (orderId == null) {
-            throw new InvalidRequestException("Order id must not be null");
+            throw new BadRequestException("Order id must not be null");
         }
         if (method == null) {
-            throw new InvalidRequestException("Payment method must not be null");
-        }
-        if (amount == null || amount.signum() <= 0) {
-            throw new InvalidRequestException("Payment amount must be positive");
-        }
-        if (paymentRepository.existsByOrderId(orderId)) {
-            throw new DuplicateException("Payment for order " + orderId + " already exists");
+            throw new BadRequestException("Payment method must not be null");
         }
 
+        Order order = orderRepository.findById(orderId);
+        if (order == null) {
+            throw new NotFoundException("Order " + orderId + " not found");
+        }
+        if (order.getPayment() != null) {
+            throw new DuplicateException("Order " + orderId + " already has a payment");
+        }
+
+        BigDecimal amount = order.getTotalPrice();
         Payment payment;
         switch (method) {
             case CARD -> {
-                if (last4Digits == null || !last4Digits.matches("\\d{4}")) {
-                    throw new InvalidRequestException("Card payment requires exactly the last 4 digits");
+                if (cardNumber == null || !cardNumber.matches("\\d{16}")) {
+                    throw new BadRequestException("Card number must have exactly 16 digits");
                 }
-                CardPayment cardPayment = new CardPayment(orderId, amount, cardHolder, last4Digits);
-                cardPayment.markPaid();
-                payment = cardPayment;
+                payment = new CardPayment(amount, cardHolder, cardNumber.substring(12));
+                order.setStatus(OrderStatus.PAID);
             }
-            case CASH -> payment = new CashPayment(orderId, amount);
-            default -> throw new InvalidRequestException("Unsupported payment method " + method);
+            case CASH -> {
+                if (order.getFulfillmentType() != FulfillmentType.PICKUP) {
+                    throw new BadRequestException("Cash payment is only allowed for pickup orders");
+                }
+                payment = new CashPayment(amount);
+            }
+            default -> throw new BadRequestException("Unsupported payment method " + method);
         }
 
+        order.setPayment(payment);
         paymentRepository.add(payment);
         return paymentMapper.toDto(payment);
     }
 
     @Override
     @Transactional
-    public PaymentDTO markPaid(Long id, BigDecimal amountGiven) {
-        Payment payment = paymentRepository.findById(id);
-        if (payment == null) {
-            throw new NotFoundException("Payment " + id + " not found");
+    public PaymentDTO markPaid(Long orderId, BigDecimal amountGiven) {
+        Order order = orderRepository.findById(orderId);
+        if (order == null || order.getPayment() == null) {
+            throw new NotFoundException("No payment for order " + orderId);
         }
+
+        Payment payment = order.getPayment();
         if (payment.getStatus() == PaymentStatus.PAID) {
-            throw new InvalidRequestException("Payment " + id + " is already paid");
+            throw new BadRequestException("Payment for order " + orderId + " is already paid");
         }
         if (!(payment instanceof CashPayment cash)) {
-            throw new InvalidRequestException("Only cash payments can be booked here");
+            throw new BadRequestException("Only cash payments can be booked here");
         }
 
         cash.markPaid(amountGiven);
+        order.setStatus(OrderStatus.PAID);
         return paymentMapper.toDto(payment);
     }
 }

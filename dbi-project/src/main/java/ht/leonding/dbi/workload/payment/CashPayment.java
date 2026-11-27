@@ -1,9 +1,9 @@
 package ht.leonding.dbi.workload.payment;
 
-import ht.leonding.dbi.error.InvalidRequestException;
 import jakarta.persistence.Column;
 import jakarta.persistence.DiscriminatorValue;
 import jakarta.persistence.Entity;
+import jakarta.ws.rs.BadRequestException;
 
 import java.math.BigDecimal;
 
@@ -20,8 +20,8 @@ public class CashPayment extends Payment {
     public CashPayment() {
     }
 
-    public CashPayment(Long orderId, BigDecimal amount) {
-        super(orderId, amount);
+    public CashPayment(BigDecimal amount) {
+        super(amount);
     }
 
     @Override
@@ -39,7 +39,7 @@ public class CashPayment extends Payment {
 
     public void markPaid(BigDecimal amountGiven) {
         if (amountGiven == null || amountGiven.compareTo(getAmount()) < 0) {
-            throw new InvalidRequestException("Insufficient cash amount for payment " + getId());
+            throw new BadRequestException("Insufficient cash amount for payment " + getId());
         }
         this.amountGiven = amountGiven;
         this.changeReturned = amountGiven.subtract(getAmount());

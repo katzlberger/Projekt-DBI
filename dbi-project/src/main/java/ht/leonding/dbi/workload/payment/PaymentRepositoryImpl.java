@@ -27,7 +27,7 @@ public class PaymentRepositoryImpl implements PaymentRepository {
 
     @Override
     public Payment findByOrderId(Long orderId) {
-        return em.createQuery("select p from Payment p where p.orderId = :orderId", Payment.class)
+        return em.createQuery("select o.payment from Order o where o.id = :orderId", Payment.class)
                 .setParameter("orderId", orderId)
                 .getResultStream()
                 .findFirst()
@@ -36,7 +36,7 @@ public class PaymentRepositoryImpl implements PaymentRepository {
 
     @Override
     public boolean existsByOrderId(Long orderId) {
-        return em.createQuery("select COUNT(p) from Payment p where p.orderId = :orderId", Long.class)
+        return em.createQuery("select count(o) from Order o where o.id = :orderId and o.payment is not null", Long.class)
                 .setParameter("orderId", orderId)
                 .getSingleResult() > 0;
     }
