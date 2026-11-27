@@ -1,0 +1,338 @@
+OrderMapper.java
+
+java
+package at.florale.mapper;
+
+import at.florale.dto.OrderDTO;
+import at.florale.dto.OrderLineDTO;
+import at.florale.entity.Order;
+import at.florale.entity.OrderLine;
+import jakarta.enterprise.context.ApplicationScoped;
+import java.math.BigDecimal;
+import java.util.List;
+
+@ApplicationScoped
+public class OrderMapper {
+
+    public OrderDTO toDTO(Order o) {
+        List<OrderLineDTO> lines = o.getLines().stream().map(this::toLineDTO).toList();
+        return new OrderDTO(
+                o.getId(),
+                o.getCustomer().getId(),
+                o.getCustomer().getFirstName() + " " + o.getCustomer().getLastName(),
+                o.getAddress() == null ? null : o.getAddress().getId(),
+                o.getOrderDate(),
+                o.getStatus(),
+                o.getFulfillmentType(),
+                o.getDeliveryDate(),
+                lines,
+                o.getTotal());
+    }
+
+    public OrderLineDTO toLineDTO(OrderLine l) {
+        return new OrderLineDTO(
+                l.getId(),
+                l.getProduct().getId(),
+                l.getProduct().getName(),
+                l.getQuantity(),
+                l.getUnitPrice(),
+                l.getUnitPrice().multiply(BigDecimal.valueOf(l.getQuantity())));
+    }
+}
+
+OrderRepository.java (Interface)
+
+java
+package at.florale.repository;
+
+import at.florale.entity.Address;
+import at.florale.entity.Customer;
+import at.florale.entity.Order;
+import at.florale.entity.OrderStatus;
+import java.time.LocalDateTime;
+import java.util.List;
+
+public interface OrderRepository {
+
+    void persist(Order order);
+
+    /** Bestelldetails mit Kunde, Adresse, Positionen und Produkten (nur eine Collection per Fetch-Join). */
+    Order findByIdWithDetails(Long id);
+
+    List<Order> search(Long customerId, OrderStatus status, LocalDateTime from, LocalDateTime toExclusive);
+
+    Customer findCustomer(Long customerId);
+
+    Address findAddress(Long addressId);
+}
+
+OrderRepositoryImpl.java
+
+java
+package at.florale.repository;
+
+import at.florale.entity.Address;
+import at.florale.entity.Customer;
+import at.florale.entity.Order;
+import at.florale.entity.OrderStatus;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.TypedQuery;
+import java.time.LocalDateTime;
+import java.util.List;
+
+@ApplicationScoped
+public class OrderRepositoryImpl implements OrderRepository {
+
+    @Inject
+    EntityManager em;
+
+    @Override
+    public void persist(Order order) {
+        em.persist(order);
+    }
+
+    @Override
+    public Order findByIdWithDetails(Long id) {
+        return em.createQuery(
+                        "select distinct o from ShopOrder o "
+                                + "join fetch o.customer "
+                                + "left join fetch o.address "
+                                + "left join fetch o.lines l "
+                                + "left join fetch l.product "
+                                + "where o.id = :id", Order.class)
+                .setParameter("id", id)
+                .getResultStream()
+                .findFirst()
+                .orElse(null);
+    }
+
+    @Override
+    public List<Order> search(Long customerId, OrderStatus status, LocalDateTime from, LocalDateTime toExclusive) {
+        StringBuilder jpql = new StringBuilder(
+                "select distinct o from ShopOrder o "
+                        + "join fetch o.customer c "
+                        + "left join fetch o.lines l "
+                        + "left join fetch l.product "
+                        + "where 1 = 1");
+        if (customerId != null) jpql.append(" and c.id = :customerId");
+        if (status != null) jpql.append(" and o.status = :status");
+        if (from != null) jpql.append(" and o.orderDate >= :from");
+        if (toExclusive != null) jpql.append(" and o.orderDate < :to");
+        jpql.append(" order by o.orderDate desc");
+
+        TypedQuery<Order> q = em.createQuery(jpql.toString(), Order.class);
+        if (customerId != null) q.setParameter("customerId", customerId);
+        if (status != null) q.setParameter("status", status);
+        if (from != null) q.setParameter("from", from);
+        if (toExclusive != null) q.setParameter("to", toExclusive);
+        return q.getResultList();
+    }
+
+    @Override
+    public Customer findCustomer(Long customerId) {
+        return em.find(Customer.class, customerId);
+    }
+
+    @Override
+    public Address findAddress(Long addressId) {
+        return em.find(Address.class, addressId);
+    }
+}
+
+OrderService.java (Interface)
+
+java
+package at.florale.service;
+
+import at.florale.dto.CreateOrderRequest;
+import at.florale.dto.OrderDTO;
+import at.florale.entity.OrderStatus;
+import java.time.LocalDate;
+import java.util.List;
+
+public interface OrderService {
+
+    OrderDTO createOrder(CreateOrderRequest request);
+
+    OrderDTO getOrder(Long orderId);
+
+    List<OrderDTO> searchOrders(Long customerId, OrderStatus status, LocalDate from, LocalDate to);
+}
+
+OrderServiceImpl.java
+
+java
+package at.florale.service;
+
+import at.florale.dto.CreateOrderRequest;
+import at.florale.dto.OrderDTO;
+import at.florale.entity.*;
+import at.florale.mapper.OrderMapper;
+import at.florale.repository.OrderRepository;
+import at.florale.repository.ProductRepository;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import jakarta.transaction.Transactional;
+import jakarta.ws.rs.BadRequestException;
+import jakarta.ws.rs.ClientErrorException;
+import jakarta.ws.rs.NotFoundException;
+import jakarta.ws.rs.core.Response;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+@ApplicationScoped
+public class OrderServiceImpl implements OrderService {
+
+    private final OrderRepository orderRepo;
+    private final ProductRepository productRepo;
+    private final OrderMapper mapper;
+
+    @Inject
+    public OrderServiceImpl(OrderRepository orderRepo, ProductRepository productRepo, OrderMapper mapper) {
+        this.orderRepo = orderRepo;
+        this.productRepo = productRepo;
+        this.mapper = mapper;
+    }
+
+    @Override
+    @Transactional
+    public OrderDTO createOrder(CreateOrderRequest r) {
+        // ---------- 1) alles validieren, bevor etwas geändert wird ----------
+        Customer customer = orderRepo.findCustomer(r.customerId());
+        if (customer == null) throw new NotFoundException("Kunde " + r.customerId() + " nicht gefunden");
+
+        Address address = null;
+        if (r.fulfillmentType() == FulfillmentType.DELIVERY) {
+            if (r.addressId() == null) throw new BadRequestException("Für Lieferung ist eine Adresse nötig");
+            if (r.deliveryDate() == null) throw new BadRequestException("Für Lieferung ist ein Lieferdatum nötig");
+            if (r.deliveryDate().isBefore(LocalDate.now())) {
+                throw new BadRequestException("Lieferdatum liegt in der Vergangenheit");
+            }
+            address = orderRepo.findAddress(r.addressId());
+            if (address == null) throw new NotFoundException("Adresse " + r.addressId() + " nicht gefunden");
+            if (!address.getCustomer().getId().equals(customer.getId())) {
+                throw new BadRequestException("Adresse gehört nicht zum Kunden");
+            }
+        }
+
+        Map<Long, Product> products = new LinkedHashMap<>();
+        for (CreateOrderRequest.Line line : r.items()) {
+            if (products.containsKey(line.productId())) {
+                throw new BadRequestException("Produkt " + line.productId() + " kommt mehrfach vor");
+            }
+            Product p = productRepo.findById(line.productId());
+            if (p == null) throw new NotFoundException("Produkt " + line.productId() + " nicht gefunden");
+            if (!p.isActive()) throw conflict("Produkt " + line.productId() + " ist nicht mehr verfügbar");
+            if (p instanceof Flower f && f.getStock() < line.quantity()) {
+                throw conflict("Zu wenig Bestand für Produkt " + line.productId());
+            }
+            products.put(line.productId(), p);
+        }
+
+        // ---------- 2) Bestellung anlegen ----------
+        Order order = new Order();
+        order.setCustomer(customer);
+        order.setAddress(address);
+        order.setOrderDate(LocalDateTime.now());
+        order.setStatus(OrderStatus.PENDING);
+        order.setFulfillmentType(r.fulfillmentType());
+        order.setDeliveryDate(r.deliveryDate());
+
+        for (CreateOrderRequest.Line line : r.items()) {
+            Product p = products.get(line.productId());
+            order.addLine(p, line.quantity(), p.getPrice()); // Preis-Snapshot
+            if (p instanceof Flower f) {
+                f.setStock(f.getStock() - line.quantity()); // verwaltete Entity, kein persist nötig
+            }
+        }
+        orderRepo.persist(order);
+        return mapper.toDTO(order);
+    }
+
+    @Override
+    @Transactional
+    public OrderDTO getOrder(Long orderId) {
+        Order order = orderRepo.findByIdWithDetails(orderId);
+        if (order == null) throw new NotFoundException("Bestellung " + orderId + " nicht gefunden");
+        return mapper.toDTO(order);
+    }
+
+    @Override
+    @Transactional
+    public List<OrderDTO> searchOrders(Long customerId, OrderStatus status, LocalDate from, LocalDate to) {
+        if (from != null && to != null && from.isAfter(to)) {
+            throw new BadRequestException("Ungültiger Zeitraum");
+        }
+        LocalDateTime fromTime = from == null ? null : from.atStartOfDay();
+        LocalDateTime toTime = to == null ? null : to.plusDays(1).atStartOfDay();
+        return orderRepo.search(customerId, status, fromTime, toTime).stream().map(mapper::toDTO).toList();
+    }
+
+    private static ClientErrorException conflict(String msg) {
+        return new ClientErrorException(msg, Response.Status.CONFLICT);
+    }
+}
+
+OrderResource.java
+
+java
+package at.florale.resource;
+
+import at.florale.dto.CreateOrderRequest;
+import at.florale.dto.OrderDTO;
+import at.florale.entity.OrderStatus;
+import at.florale.service.OrderService;
+import jakarta.inject.Inject;
+import jakarta.validation.Valid;
+import jakarta.ws.rs.*;
+import jakarta.ws.rs.core.Context;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
+import jakarta.ws.rs.core.UriInfo;
+import java.time.LocalDate;
+
+@Path("/api/orders")
+@Produces(MediaType.APPLICATION_JSON)
+@Consumes(MediaType.APPLICATION_JSON)
+public class OrderResource {
+
+    @Inject
+    OrderService service;
+
+    @Context
+    UriInfo uriInfo;
+
+    @POST
+    public Response createOrder(@Valid CreateOrderRequest request) {
+        OrderDTO dto = service.createOrder(request);
+        return Response.created(uriInfo.getAbsolutePathBuilder().path("{id}").build(dto.id()))
+                .entity(dto).build();
+    }
+
+    @GET
+    @Path("/{orderId}")
+    public Response getOrder(@PathParam("orderId") Long orderId) {
+        return Response.ok(service.getOrder(orderId)).build();
+    }
+
+    @GET
+    public Response searchOrders(@QueryParam("customerId") Long customerId,
+                                 @QueryParam("status") String status,
+                                 @QueryParam("from") LocalDate from,
+                                 @QueryParam("to") LocalDate to) {
+        OrderStatus parsed = null;
+        if (status != null && !status.isBlank()) {
+            try {
+                parsed = OrderStatus.valueOf(status.toUpperCase());
+            } catch (IllegalArgumentException e) {
+                throw new BadRequestException("Unbekannter Status: " + status);
+            }
+        }
+        return Response.ok(service.searchOrders(customerId, parsed, from, to)).build();
+    }
+}
