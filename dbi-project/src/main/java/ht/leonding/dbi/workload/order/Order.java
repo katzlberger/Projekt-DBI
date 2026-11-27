@@ -1,10 +1,12 @@
 package ht.leonding.dbi.workload.order;
 
+import ht.leonding.dbi.error.InvalidRequestException;
+import ht.leonding.dbi.workload.customer.Customer;
+import ht.leonding.dbi.workload.customer.address.Address;
 import ht.leonding.dbi.workload.order.line.OrderLine;
 import ht.leonding.dbi.workload.payment.Payment;
 import ht.leonding.dbi.workload.payment.PaymentStatus;
 import jakarta.persistence.*;
-import jakarta.ws.rs.BadRequestException;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -31,7 +33,14 @@ public class Order {
     @Column(nullable=false)
     private FulfillmentType fulfillmentType;
 
+    @Column(nullable=false)
     private LocalDate deliveryDate;
+
+    @ManyToOne(optional = false, fetch = FetchType.LAZY)
+    private Customer customer;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    private Address deliveryAddress;
 
     @OneToOne(cascade=CascadeType.ALL, orphanRemoval=true)
     @JoinColumn(name="payment_id")
@@ -43,9 +52,11 @@ public class Order {
     public Order() {
     }
 
-    public Order(FulfillmentType fulfillmentType, LocalDate deliveryDate) {
+    public Order(Customer customer, FulfillmentType fulfillmentType, LocalDate deliveryDate, Address deliveryAddress) {
+        this.customer = customer;
         this.fulfillmentType = fulfillmentType;
         this.deliveryDate = deliveryDate;
+        this.deliveryAddress = deliveryAddress;
     }
 
     public Long getId() {
@@ -60,16 +71,20 @@ public class Order {
         return status;
     }
 
-    public void setStatus(OrderStatus status) {
-        this.status = status;
-    }
-
     public FulfillmentType getFulfillmentType() {
         return fulfillmentType;
     }
 
     public LocalDate getDeliveryDate() {
         return deliveryDate;
+    }
+
+    public Customer getCustomer() {
+        return customer;
+    }
+
+    public Address getDeliveryAddress() {
+        return deliveryAddress;
     }
 
     public Payment getPayment() {
@@ -95,13 +110,37 @@ public class Order {
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
+    public void markPaid() {
+        requireStatus(OrderStatus.NEW);
+        this.status = OrderStatus.PAID;
+    }
+
+    public void markReady() {
+        requireStatus(OrderStatus.PAID);
+        this.status = OrderStatus.READY;
+    }
+
+    public void complete() {
+        requireStatus(OrderStatus.READY);
+        this.status = OrderStatus.COMPLETED;
+    }
+
     public void cancel() {
         if (status != OrderStatus.NEW) {
-            throw new BadRequestException("Only new orders can be cancelled");
+            throw new InvalidRequestException("Only new orders can be cancelled");
         }
         if (payment != null && payment.getStatus() != PaymentStatus.PENDING) {
-            throw new BadRequestException("An order with a paid payment cannot be cancelled");
+            throw new InvalidRequestException("An order with a paid payment cannot be cancelled");
+        }
+        for (OrderLine line : lines) {
+            line.getProduct().releaseStock(line.getQuantity());
         }
         this.status = OrderStatus.CANCELLED;
+    }
+
+    private void requireStatus(OrderStatus expected) {
+        if (status != expected) {
+            throw new InvalidRequestException("Order " + id + " is " + status + ", expected " + expected);
+        }
     }
 }

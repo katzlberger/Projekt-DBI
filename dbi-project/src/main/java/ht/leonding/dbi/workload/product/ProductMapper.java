@@ -14,10 +14,12 @@ import java.util.List;
 @ApplicationScoped
 public class ProductMapper {
     public Object toDTO(Product p) {
-        if (p instanceof Flower f) return toFlowerDTO(f);
-        if (p instanceof Accessory a) return toAccessoryDTO(a);
-        if (p instanceof Bouquet b) return toBouquetDTO(b);
-        throw new IllegalArgumentException("Unbekannter Produkttyp: " + p.getClass());
+        return switch (p.getProductType()) {
+            case "FLOWER" -> toFlowerDTO((Flower) p);
+            case "ACCESSORY" -> toAccessoryDTO((Accessory) p);
+            case "BOUQUET" -> toBouquetDTO((Bouquet) p);
+            default -> throw new IllegalArgumentException("Unbekannter Produkttyp: " + p.getProductType());
+        };
     }
 
     public FlowerDTO toFlowerDTO(Flower f) {
@@ -28,7 +30,7 @@ public class ProductMapper {
                 f.isActive(),
                 f.getColor(),
                 f.getStock(),
-                "FLOWER");
+                f.getProductType());
     }
 
     public AccessoryDTO toAccessoryDTO(Accessory a) {

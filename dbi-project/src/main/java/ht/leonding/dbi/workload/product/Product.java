@@ -29,4 +29,8 @@ public abstract class Product {
     public void setPrice(BigDecimal price) { this.price = price; }
     public boolean isActive() { return active; }
     public void setActive(boolean active) { this.active = active; }
+
+    public abstract String getProductType();
+    public abstract void reserveStock(int quantity);
+    public abstract void releaseStock(int quantity);
 }

@@ -1,5 +1,6 @@
 package ht.leonding.dbi.workload.order.line;
 
+import ht.leonding.dbi.error.InvalidRequestException;
 import ht.leonding.dbi.workload.order.Order;
 import ht.leonding.dbi.workload.product.Product;
 import jakarta.persistence.*;
@@ -30,6 +31,9 @@ public class OrderLine {
     }
 
     public OrderLine(Product product, int quantity) {
+        if (quantity < 1) {
+            throw new InvalidRequestException("Quantity must be at least 1");
+        }
         this.product = product;
         this.quantity = quantity;
         this.unitPrice = product.getPrice();
